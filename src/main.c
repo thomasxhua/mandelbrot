@@ -188,25 +188,8 @@ int main()
     if (!frag_buffer)
         return 1;
     // preprocess shaders
-    //char* vert_pp_buffer = new_preprocessed_shader(vert_buffer, NULL);
-    //char* frag_pp_buffer = new_preprocessed_shader(frag_buffer, NULL);
     char* vert_pp_buffer = new_preprocessed_shader(vert_buffer);
     char* frag_pp_buffer = new_preprocessed_shader(frag_buffer);
-    /*
-    // included shaders
-    const size_t included_size      = utils_buffer_size + complex_buffer_size;
-    const size_t vert_included_size = included_size + vert_buffer_size;
-    const size_t frag_included_size = included_size + frag_buffer_size;
-    char* vert_included_buffer = calloc(vert_included_size, sizeof(char));
-    strcat(vert_included_buffer, utils_buffer);
-    strcat(vert_included_buffer, complex_buffer);
-    strcat(vert_included_buffer, vert_buffer);
-    char* frag_included_buffer = calloc(frag_included_size, sizeof(char));
-    strcat(frag_included_buffer, utils_buffer);
-    strcat(frag_included_buffer, complex_buffer);
-    strcat(frag_included_buffer, frag_buffer);
-    */
-
     // load shaders
     GLuint vs = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vs, 1, (const char* const*)&vert_pp_buffer, NULL);
