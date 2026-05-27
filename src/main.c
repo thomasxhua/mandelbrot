@@ -7,14 +7,14 @@
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
 
-#define SHADER_FILE_SIZE 512
+#define INFO_LOG_SIZE 512
 
 #ifndef __FUNCTION__
     #define __FUNCTION__ "__FUNCTION__"
 #endif
 
 #define MSG_ERROR "[ERROR] "
-#define MSG_ERROR_FAILED_ALLOCATION "[ERROR] Failed allocation in "
+#define MSG_ERROR_FAILED_ALLOCATION MSG_ERROR "Failed allocation in "
 
 #define INCLUDE_STR "include"
 #define INCLUDE_STR_SIZE 7
@@ -27,7 +27,7 @@ char* new_read_file(const char* path)
     file = fopen(path, "r");
     if (!file)
     {
-        printf("Failed reading '%s'.", path);
+        fprintf(stderr, "Failed reading '%s'.", path);
         return NULL;
     }
     // get number of bytes
@@ -39,13 +39,12 @@ char* new_read_file(const char* path)
     char* buffer = calloc(numbytes + 1 + 1, sizeof(char));
     if (buffer == NULL)
     {
-        printf("Failed allocation.");
+        fprintf(stderr, MSG_ERROR_FAILED_ALLOCATION "%s", __FUNCTION__);
         fclose(file);
         return NULL;
     }
     fread(buffer, sizeof(char), numbytes, file);
-    buffer[numbytes] = '\n'; // dont need that since calloc?
-    printf("%s", buffer);
+    buffer[numbytes] = '\n';
     fclose(file);
     return buffer;
 }
@@ -67,7 +66,7 @@ char* new_preprocessed_shader(const char* shader)
             {
                 if (*quote == '\0' || *quote == '\n')
                 {
-                    printf(MSG_ERROR "%s: incomplete include directive.", __FUNCTION__);
+                    fprintf(stderr, MSG_ERROR "%s: incomplete include directive.", __FUNCTION__);
                     return NULL;
                 }
             }
@@ -76,7 +75,7 @@ char* new_preprocessed_shader(const char* shader)
             {
                 if (*quote == '\0' || *quote == '\n')
                 {
-                    printf(MSG_ERROR "%s: incomplete file name in include directive.", __FUNCTION__);
+                    fprintf(stderr, MSG_ERROR "%s: incomplete file name in include directive.", __FUNCTION__);
                     return NULL;
                 }
             }
@@ -85,7 +84,7 @@ char* new_preprocessed_shader(const char* shader)
             char* file_name = calloc(file_name_size + 1, sizeof(char));
             if (!file_name)
             {
-                printf(MSG_ERROR_FAILED_ALLOCATION "%s", __FUNCTION__);
+                fprintf(stderr, MSG_ERROR_FAILED_ALLOCATION "%s", __FUNCTION__);
                 return NULL;
             }
             memcpy(file_name, file_lhs, file_name_size);
@@ -101,7 +100,7 @@ char* new_preprocessed_shader(const char* shader)
             new_shader_buffer = calloc(before_size + strlen(file_buffer) + after_size + 1, sizeof(char));
             if (!new_shader_buffer)
             {
-                printf(MSG_ERROR_FAILED_ALLOCATION "%s", __FUNCTION__);
+                fprintf(stderr, MSG_ERROR_FAILED_ALLOCATION "%s", __FUNCTION__);
             }
             strncat(new_shader_buffer, shader, before_size);
             strcat(new_shader_buffer, file_buffer);
@@ -134,7 +133,7 @@ int main()
     //
     if (!glfwInit())
     {
-        fprintf(stderr, "ERROR: Couldn't start GLFW3.\n");
+        fprintf(stderr, MSG_ERROR "Couldn't start GLFW3.\n");
         return 1;
     }
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -144,14 +143,14 @@ int main()
     GLFWwindow* window = glfwCreateWindow(800, 800, "ayo", NULL, NULL);
     if (!window)
     {
-        fprintf(stderr, "ERROR: Couldn't open window with GLFW3.\n");
+        fprintf(stderr, MSG_ERROR "Couldn't open window with GLFW3.\n");
         return 1;
     }
     glfwMakeContextCurrent(window);
     const int version_glad = gladLoadGL(glfwGetProcAddress);
     if (version_glad == 0)
     {
-        fprintf(stderr, "ERROR: Failed to initialize OpenGL context.\n");
+        fprintf(stderr, MSG_ERROR "Failed to initialize OpenGL context.\n");
     }
     printf("Load OpenGL %i.%i\n",
         GLAD_VERSION_MAJOR(version_glad),
@@ -204,24 +203,24 @@ int main()
     glLinkProgram(shader_program);
     // logs
     GLint success;
-    GLchar info_log[512];
+    GLchar info_log[INFO_LOG_SIZE];
     glGetShaderiv(vs, GL_COMPILE_STATUS, &success);
     if (!success)
     {
-        glGetShaderInfoLog(vs, 512, NULL, info_log);
-        printf("Vertex shader error:\n%s\n", info_log);
+        glGetShaderInfoLog(vs, INFO_LOG_SIZE, NULL, info_log);
+        fprintf(stderr, MSG_ERROR "Vertex shader:\n%s\n", info_log);
     }
     glGetShaderiv(fs, GL_COMPILE_STATUS, &success);
     if (!success)
     {
-        glGetShaderInfoLog(fs, 512, NULL, info_log);
-        printf("Fragment shader error:\n%s\n", info_log);
+        glGetShaderInfoLog(fs, INFO_LOG_SIZE, NULL, info_log);
+        fprintf(stderr, MSG_ERROR "Fragment shader:\n%s\n", info_log);
     }
     glGetProgramiv(shader_program, GL_LINK_STATUS, &success);
     if (!success)
     {
-        glGetProgramInfoLog(shader_program, 512, NULL, info_log);
-        printf("Program link error:\n%s\n", info_log);
+        glGetProgramInfoLog(shader_program, INFO_LOG_SIZE, NULL, info_log);
+        fprintf(stderr, MSG_ERROR "Program link:\n%s\n", info_log);
     }
     // loop
     while (!glfwWindowShouldClose(window))

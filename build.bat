@@ -4,5 +4,5 @@ gcc ./src/main.c ./extern/glad/src/gl.c ^
     -I./extern/glfw/include/ ^
     -L ./ ^
     -lglfw3 ^
-    -o main
+    -o ./dist/main
 
