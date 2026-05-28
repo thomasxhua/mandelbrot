@@ -7,7 +7,7 @@
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
 
-#define INFO_LOG_SIZE 512
+#define SHADER_LOG_SIZE 2048
 
 #ifndef __FUNCTION__
     #define __FUNCTION__ "__FUNCTION__"
@@ -18,6 +18,8 @@
 
 #define INCLUDE_STR "include"
 #define INCLUDE_STR_SIZE 7
+
+#define TITLE_COUNTDOWN_S_INITIAL 0.1
 
 // https://fundza.com/c4serious/fileIO_reading_all/index.html
 char* new_read_file(const char* path)
@@ -125,9 +127,16 @@ char* new_preprocessed_shader(const char* shader)
     }
 }
 
-// https://antongerdelan.net/opengl/hellotriangle.html
+void error_callback_glfw(const int error, const char* description)
+{
+    fprintf(stderr, MSG_ERROR "GLFW: code %i msg: %s.\n", error, description);
+}
+
+// https://antongerdelan.net/opengl/
 int main()
 {
+    printf("Starting GLFW %s.\n", glfwGetVersionString());
+    glfwSetErrorCallback(error_callback_glfw);
     //
     // init OpenGL
     //
@@ -140,7 +149,25 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    GLFWwindow* window = glfwCreateWindow(800, 800, "ayo", NULL, NULL);
+    // anti aliasing
+    glfwWindowHint(GLFW_SAMPLES, 8);
+    // full screen
+    bool full_screen = false;
+    GLFWmonitor* monitor = NULL;
+    int win_w = 800, win_h = 600;
+    if (full_screen)
+    {
+        monitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+        // borderless fullscreen
+        glfwWindowHint(GLFW_RED_BITS, mode->redBits);
+        glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
+        glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
+        glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
+        win_w = mode->width;
+        win_h = mode->height;
+    }
+    GLFWwindow* window = glfwCreateWindow(win_w, win_h, "Mandelbrot", monitor, NULL);
     if (!window)
     {
         fprintf(stderr, MSG_ERROR "Couldn't open window with GLFW3.\n");
@@ -160,7 +187,7 @@ int main()
     //
     // draw triangle
     //
-    float points[] =
+    const float points[] =
     {
         // https://stackoverflow.com/questions/2588875/whats-the-best-way-to-draw-a-fullscreen-quad-in-opengl-3-2
         -1.0f, -1.0f, 0.0f, // A
@@ -189,43 +216,73 @@ int main()
     // preprocess shaders
     char* vert_pp_buffer = new_preprocessed_shader(vert_buffer);
     char* frag_pp_buffer = new_preprocessed_shader(frag_buffer);
-    // load shaders
+    GLint params;
+    // vertex shader
     GLuint vs = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vs, 1, (const char* const*)&vert_pp_buffer, NULL);
     glCompileShader(vs);
+    glGetShaderiv(vs, GL_COMPILE_STATUS, &params);
+    if (params != GL_TRUE)
+    {
+        GLchar log[SHADER_LOG_SIZE];
+        glGetShaderInfoLog(vs, SHADER_LOG_SIZE, NULL, log);
+        fprintf(stderr, MSG_ERROR "Shader index %u did not compile.\n%s\n", vs, log);
+        return 1;
+    }
+    // fragment shader
     GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fs, 1, (const char* const*)&frag_pp_buffer, NULL);
     glCompileShader(fs);
-    // program
+    glGetShaderiv(fs, GL_COMPILE_STATUS, &params);
+    if (params != GL_TRUE)
+    {
+        GLchar log[SHADER_LOG_SIZE];
+        glGetShaderInfoLog(fs, SHADER_LOG_SIZE, NULL, log);
+        fprintf(stderr, MSG_ERROR "Shader index %u did not compile.\n%s\n", fs, log);
+        return 1;
+    }
+    // link program
     GLuint shader_program = glCreateProgram();
     glAttachShader(shader_program, vs);
     glAttachShader(shader_program, fs);
     glLinkProgram(shader_program);
-    // logs
-    GLint success;
-    GLchar info_log[INFO_LOG_SIZE];
-    glGetShaderiv(vs, GL_COMPILE_STATUS, &success);
-    if (!success)
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+    glGetShaderiv(shader_program, GL_LINK_STATUS, &params);
+    if (params != GL_TRUE)
     {
-        glGetShaderInfoLog(vs, INFO_LOG_SIZE, NULL, info_log);
-        fprintf(stderr, MSG_ERROR "Vertex shader:\n%s\n", info_log);
+        GLchar log[SHADER_LOG_SIZE];
+        glGetShaderInfoLog(shader_program, SHADER_LOG_SIZE, NULL, log);
+        fprintf(stderr, MSG_ERROR "Could not link shader program GL index %u.\n%s\n", shader_program, log);
+        return 1;
     }
-    glGetShaderiv(fs, GL_COMPILE_STATUS, &success);
-    if (!success)
-    {
-        glGetShaderInfoLog(fs, INFO_LOG_SIZE, NULL, info_log);
-        fprintf(stderr, MSG_ERROR "Fragment shader:\n%s\n", info_log);
-    }
-    glGetProgramiv(shader_program, GL_LINK_STATUS, &success);
-    if (!success)
-    {
-        glGetProgramInfoLog(shader_program, INFO_LOG_SIZE, NULL, info_log);
-        fprintf(stderr, MSG_ERROR "Program link:\n%s\n", info_log);
-    }
+    double prev_s            = glfwGetTime();
+    double title_countdown_s = TITLE_COUNTDOWN_S_INITIAL;
     // loop
     while (!glfwWindowShouldClose(window))
     {
+        // fps
+        const double curr_s    = glfwGetTime();
+        const double elapsed_s = curr_s - prev_s;
+        prev_s                 = curr_s;
+        // print fps every title_countdown seconds
+        title_countdown_s      -= elapsed_s;
+        if (title_countdown_s <= 0.0 && elapsed_s > 0.0)
+        {
+            const double fps = 1.0 / elapsed_s;
+            char tmp[256];
+            sprintf(tmp, "%.2lf FPS (%.2lfms/frame)", fps, 1000.0/fps);
+            glfwSetWindowTitle(window, tmp);
+            title_countdown_s = TITLE_COUNTDOWN_S_INITIAL;
+        }
+        // handle input
         glfwPollEvents();
+        if (GLFW_PRESS == glfwGetKey(window, GLFW_KEY_ESCAPE))
+            glfwSetWindowShouldClose(window, 1);
+        // check resize
+        glfwGetWindowSize(window, &win_w, &win_h);
+        glViewport(0, 0, win_w, win_h);
+        // draw
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glUseProgram(shader_program);
         glBindVertexArray(vao);

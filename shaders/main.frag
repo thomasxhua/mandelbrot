@@ -15,7 +15,7 @@ float f(float x)
 void main()
 {
     vec2 uv = gl_FragCoord.xy;
-    uv = uv / vec2(800.0, 800.0);
+    uv = uv / vec2(800.0, 600.0);
     uv = (uv * 2.0) - 1.0;
     if (is_within(uv.x, 0.0, THICC))
         frag_color = vec4(1,1,1,1);
