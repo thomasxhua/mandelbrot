@@ -13,13 +13,20 @@
     #define __FUNCTION__ "__FUNCTION__"
 #endif
 
+#define MSG_DEBUG "[DEBUG] "
 #define MSG_ERROR "[ERROR] "
 #define MSG_ERROR_FAILED_ALLOCATION MSG_ERROR "Failed allocation in "
+#define MSG_TITLE_MANDELBROT "Mandelbrot"
+#define MSG_TITLE_DELIMITER " | "
+#define MSG_TITLE_INVALID_PROGRAM "Invalid program!"
 
 #define INCLUDE_STR "include"
 #define INCLUDE_STR_SIZE 7
 
 #define TITLE_COUNTDOWN_S_INITIAL 0.1
+
+#define PATH_MAIN_FRAG "shaders/main.frag"
+#define PATH_MAIN_VERT "shaders/main.vert"
 
 // https://fundza.com/c4serious/fileIO_reading_all/index.html
 char* new_read_file(const char* path)
@@ -132,6 +139,73 @@ void error_callback_glfw(const int error, const char* description)
     fprintf(stderr, MSG_ERROR "GLFW: code %i msg: %s.\n", error, description);
 }
 
+GLuint new_shader_program_from_strings(const char* vs_str, const char* fs_str, bool* is_valid_program)
+{
+    GLint params;
+    GLuint shader_program = glCreateProgram();
+    // vertex shader
+    GLuint vs = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vs, 1, &vs_str, NULL);
+    glCompileShader(vs);
+    glGetShaderiv(vs, GL_COMPILE_STATUS, &params);
+    if (params != GL_TRUE)
+    {
+        GLchar log[SHADER_LOG_SIZE];
+        glGetShaderInfoLog(vs, SHADER_LOG_SIZE, NULL, log);
+        fprintf(stderr, MSG_ERROR "Shader index %u did not compile.\n%s\n", vs, log);
+        return shader_program;
+    }
+    // fragment shader
+    GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fs, 1, &fs_str, NULL);
+    glCompileShader(fs);
+    glGetShaderiv(fs, GL_COMPILE_STATUS, &params);
+    if (params != GL_TRUE)
+    {
+        GLchar log[SHADER_LOG_SIZE];
+        glGetShaderInfoLog(fs, SHADER_LOG_SIZE, NULL, log);
+        fprintf(stderr, MSG_ERROR "Shader index %u did not compile.\n%s\n", fs, log);
+        // TODO: prevent from multiple times a second
+        return shader_program;
+    }
+    // link program
+    glAttachShader(shader_program, vs);
+    glAttachShader(shader_program, fs);
+    glLinkProgram(shader_program);
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+    glGetShaderiv(shader_program, GL_LINK_STATUS, &params);
+    if (params != GL_TRUE)
+    {
+        *is_valid_program = false;
+        GLchar log[SHADER_LOG_SIZE];
+        glGetShaderInfoLog(shader_program, SHADER_LOG_SIZE, NULL, log);
+        fprintf(stderr, MSG_ERROR "Could not link shader program GL index %u.\n%s\n", shader_program, log);
+        return shader_program;
+    }
+    *is_valid_program = true;
+    return shader_program;
+}
+
+GLuint new_shader_program_from_paths(const char* vs_path, const char* fs_path, bool* is_valid_program)
+{
+    char* vert_buffer = new_read_file(vs_path);
+    if (!vert_buffer)
+        return 1;
+    char* frag_buffer = new_read_file(fs_path);
+    if (!frag_buffer)
+        return 1;
+    // preprocess shaders
+    char* vert_pp_buffer        = new_preprocessed_shader(vert_buffer);
+    char* frag_pp_buffer        = new_preprocessed_shader(frag_buffer);
+    const GLuint shader_program = new_shader_program_from_strings(vert_pp_buffer, frag_pp_buffer, is_valid_program);
+    free(vert_buffer);
+    free(frag_buffer);
+    free(vert_pp_buffer);
+    free(frag_pp_buffer);
+    return shader_program;
+}
+
 // https://antongerdelan.net/opengl/
 int main()
 {
@@ -154,7 +228,7 @@ int main()
     // full screen
     bool full_screen = false;
     GLFWmonitor* monitor = NULL;
-    int win_w = 800, win_h = 600;
+    int width = 800, height = 600;
     if (full_screen)
     {
         monitor = glfwGetPrimaryMonitor();
@@ -164,10 +238,10 @@ int main()
         glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
         glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
         glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
-        win_w = mode->width;
-        win_h = mode->height;
+        width  = mode->width;
+        height = mode->height;
     }
-    GLFWwindow* window = glfwCreateWindow(win_w, win_h, "Mandelbrot", monitor, NULL);
+    GLFWwindow* window = glfwCreateWindow(width, height, MSG_TITLE_MANDELBROT, monitor, NULL);
     if (!window)
     {
         fprintf(stderr, MSG_ERROR "Couldn't open window with GLFW3.\n");
@@ -207,60 +281,41 @@ int main()
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
     // read shaders
-    char* vert_buffer = new_read_file("shaders/main.vert");
-    if (!vert_buffer)
-        return 1;
-    char* frag_buffer = new_read_file("shaders/main.frag");
-    if (!frag_buffer)
-        return 1;
-    // preprocess shaders
-    char* vert_pp_buffer = new_preprocessed_shader(vert_buffer);
-    char* frag_pp_buffer = new_preprocessed_shader(frag_buffer);
-    GLint params;
-    // vertex shader
-    GLuint vs = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vs, 1, (const char* const*)&vert_pp_buffer, NULL);
-    glCompileShader(vs);
-    glGetShaderiv(vs, GL_COMPILE_STATUS, &params);
-    if (params != GL_TRUE)
-    {
-        GLchar log[SHADER_LOG_SIZE];
-        glGetShaderInfoLog(vs, SHADER_LOG_SIZE, NULL, log);
-        fprintf(stderr, MSG_ERROR "Shader index %u did not compile.\n%s\n", vs, log);
-        return 1;
-    }
-    // fragment shader
-    GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fs, 1, (const char* const*)&frag_pp_buffer, NULL);
-    glCompileShader(fs);
-    glGetShaderiv(fs, GL_COMPILE_STATUS, &params);
-    if (params != GL_TRUE)
-    {
-        GLchar log[SHADER_LOG_SIZE];
-        glGetShaderInfoLog(fs, SHADER_LOG_SIZE, NULL, log);
-        fprintf(stderr, MSG_ERROR "Shader index %u did not compile.\n%s\n", fs, log);
-        return 1;
-    }
-    // link program
-    GLuint shader_program = glCreateProgram();
-    glAttachShader(shader_program, vs);
-    glAttachShader(shader_program, fs);
-    glLinkProgram(shader_program);
-    glDeleteShader(vs);
-    glDeleteShader(fs);
-    glGetShaderiv(shader_program, GL_LINK_STATUS, &params);
-    if (params != GL_TRUE)
-    {
-        GLchar log[SHADER_LOG_SIZE];
-        glGetShaderInfoLog(shader_program, SHADER_LOG_SIZE, NULL, log);
-        fprintf(stderr, MSG_ERROR "Could not link shader program GL index %u.\n%s\n", shader_program, log);
-        return 1;
-    }
+    bool is_valid_program = false;
+    GLuint shader_program = new_shader_program_from_paths(PATH_MAIN_VERT, PATH_MAIN_FRAG, &is_valid_program);
+    // loop
     double prev_s            = glfwGetTime();
     double title_countdown_s = TITLE_COUNTDOWN_S_INITIAL;
-    // loop
+    // check uniform locations
+    int time_loc   = glGetUniformLocation(shader_program, "time");
+    int width_loc  = glGetUniformLocation(shader_program, "width");
+    int height_loc = glGetUniformLocation(shader_program, "height");
     while (!glfwWindowShouldClose(window))
     {
+        // handle input
+        glfwPollEvents();
+        if (GLFW_PRESS == glfwGetKey(window, GLFW_KEY_ESCAPE))
+        {
+            glfwSetWindowShouldClose(window, 1);
+            continue;
+        }
+        else if (GLFW_PRESS == glfwGetKey(window, GLFW_KEY_R))
+        {
+            // hot reload
+            glDeleteProgram(shader_program);
+            shader_program = new_shader_program_from_paths(PATH_MAIN_VERT, PATH_MAIN_FRAG, &is_valid_program);
+            time_loc       = glGetUniformLocation(shader_program, "time");
+            width_loc      = glGetUniformLocation(shader_program, "width");
+            height_loc     = glGetUniformLocation(shader_program, "height");
+            continue;
+        }
+        // handle invalid program
+        if (!is_valid_program)
+        {
+            title_countdown_s = TITLE_COUNTDOWN_S_INITIAL;
+            glfwSetWindowTitle(window, MSG_TITLE_MANDELBROT MSG_TITLE_DELIMITER MSG_TITLE_INVALID_PROGRAM);
+            continue;
+        }
         // fps
         const double curr_s    = glfwGetTime();
         const double elapsed_s = curr_s - prev_s;
@@ -271,29 +326,30 @@ int main()
         {
             const double fps = 1.0 / elapsed_s;
             char tmp[256];
-            sprintf(tmp, "%.2lf FPS (%.2lfms/frame)", fps, 1000.0/fps);
+            sprintf(tmp, MSG_TITLE_MANDELBROT MSG_TITLE_DELIMITER "%.2lf FPS (%.2lfms/frame)", fps, 1000.0/fps);
             glfwSetWindowTitle(window, tmp);
             title_countdown_s = TITLE_COUNTDOWN_S_INITIAL;
         }
-        // handle input
-        glfwPollEvents();
-        if (GLFW_PRESS == glfwGetKey(window, GLFW_KEY_ESCAPE))
-            glfwSetWindowShouldClose(window, 1);
         // check resize
-        glfwGetWindowSize(window, &win_w, &win_h);
-        glViewport(0, 0, win_w, win_h);
+        glfwGetWindowSize(window, &width, &height);
+        glViewport(0, 0, width, height);
         // draw
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glUseProgram(shader_program);
+        // handle uniform
+        if (time_loc > -1)
+            glUniform1f(time_loc, (float)curr_s);
+        if (width_loc > -1)
+            glUniform1f(width_loc, (float)width);
+        if (height_loc > -1)
+            glUniform1f(height_loc, (float)height);
+        // continue draw
         glBindVertexArray(vao);
         glDrawArrays(GL_TRIANGLES, 0, 3);
         glfwSwapBuffers(window);
     }
     // clean
-    free(vert_buffer);
-    free(frag_buffer);
-    free(vert_pp_buffer);
-    free(frag_pp_buffer);
+    glDeleteProgram(shader_program);
     glfwTerminate();
     return 0;
 }
