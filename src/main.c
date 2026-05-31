@@ -223,12 +223,11 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    // anti aliasing
-    glfwWindowHint(GLFW_SAMPLES, 8);
+    // // anti aliasing
     // full screen
     bool full_screen = false;
     GLFWmonitor* monitor = NULL;
-    int width = 800, height = 600;
+    int width = 800, height = 800;
     if (full_screen)
     {
         monitor = glfwGetPrimaryMonitor();
@@ -338,11 +337,11 @@ int main()
         glUseProgram(shader_program);
         // handle uniform
         if (time_loc > -1)
-            glUniform1f(time_loc, (float)curr_s);
+            glUniform1f(time_loc, curr_s);
         if (width_loc > -1)
-            glUniform1f(width_loc, (float)width);
+            glUniform1f(width_loc, width);
         if (height_loc > -1)
-            glUniform1f(height_loc, (float)height);
+            glUniform1f(height_loc, height);
         // continue draw
         glBindVertexArray(vao);
         glDrawArrays(GL_TRIANGLES, 0, 3);
