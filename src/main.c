@@ -223,7 +223,8 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    // // anti aliasing
+    // anti aliasing
+    glfwWindowHint(GLFW_SAMPLES, 8);
     // full screen
     bool full_screen = false;
     GLFWmonitor* monitor = NULL;
