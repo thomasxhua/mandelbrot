@@ -40,7 +40,8 @@ void main()
 {
     // prepare coords
     vec2 uv = gl_FragCoord.xy;
-    uv = uv / vec2(width, height);
+    uv = uv / 1000.0;
+    //uv = uv / vec2(width, height);
     uv = (uv * 2.0) - 1.0;
     uv = uv - vec2(0.5, 0.0);
     uv = 1.5*uv;
@@ -52,6 +53,30 @@ void main()
     uint iterations = mandelbrot(uv, 1000, INFINITY);
     if (iterations == OUTSIDE_MANDELBROT)
         frag_color = vec4(0,0,0,1);
+    else if (iterations % 2 == 0)
+        frag_color = vec4(
+            float(iterations)/100.0,
+            float(iterations)/200.0,
+            float(iterations)/50.0,
+            1);
+    else if (iterations % 3 == 0)
+        frag_color = vec4(
+            float(iterations)/400.0,
+            float(iterations)/400.0,
+            float(iterations)/50.0,
+            1);
+    else if (iterations % 5 == 0)
+        frag_color = vec4(
+            float(iterations)/50.0,
+            float(iterations)/600.0,
+            float(iterations)/200.0,
+            1);
+    else if (iterations % 7 == 0)
+        frag_color = vec4(
+            float(iterations)/50.0,
+            float(iterations)/800.0,
+            float(iterations)/100.0,
+            1);
     else 
         frag_color = vec4(
             float(iterations)/100.0,
